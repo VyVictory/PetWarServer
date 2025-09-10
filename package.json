@@ -9,10 +9,9 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "node build/index.js",
-    "loadtest": "tsx loadtest/example.ts --room my_room --numClients 2",
     "build": "npm run clean && tsc",
     "clean": "rimraf build",
+    "start": "node build/index.js",
     "test": "mocha -r tsx test/**_test.ts --exit --timeout 15000"
   },
   "author": "",
