@@ -1,0 +1,12 @@
+{
+	"login": {
+		"success": "Đăng nhập thành công !",
+		"user_not_found": "Tài khoản hoặc mật khẩu không chính xác !",
+		"invalid_password":"Tài khoản hoặc mật khẩu không chính xác !"
+	},
+	"register": {
+		"success": "Đăng ký thành công !",
+		"fail": "Đăng ký thất bại !",
+		"already":"Người dùng tồn tại !"
+	}
+}
