@@ -3,70 +3,47 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { CONFIG } from "../../config";
 import { UserModel } from "../../models/user/user.model";
+
 export const login = async (req: Request, res: Response) => {
-    const { username, password } = req.body;
-    const user = await UserModel.findOne({
-        $or: [{ username }, { email: username }]
-    });
+    try {
+        const { username, password } = req.body;
+        const user = await UserModel.findOne({
+            $or: [{ username }, { email: username }]
+        }).lean();
 
+        if (!user) {
+            return res.status(200).json({ success: false, messageKey: "login.user_not_found" });
+        }
 
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(200).json({ success: false, messageKey: "login.invalid_password" });
+        }
 
-    if (!user) {
-        return res.status(200).json({
-            success: false,
-            message: req.__("login.user_not_found")
-        });
+        const token = jwt.sign({ id: user._id, username: user.username }, CONFIG.JWT_SECRET, { expiresIn: "1h" });
+
+        return res.status(200).json({ success: true, messageKey: "login.success", token });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, messageKey: "error.server_error" });
     }
-    // So sánh password với bcrypt
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-        return res.status(200).json({
-            success: false,
-            message: req.__("login.invalid_password")
-        });
-    }
-    // Tạo JWT
-    const token = jwt.sign(
-        { id: user._id, username: user.username, email: user.email },
-        CONFIG.JWT_SECRET,
-        { expiresIn: "1h" }
-    );
-    return res.status(200).json({ success: true, message: req.__("login.success"), token: token });
 };
+
 export const register = async (req: Request, res: Response) => {
-    const { username, email, password } = req.body;
-    const user = await UserModel.findOne({
-        $or: [{ email }, { username }]
-    });
-    if (user) {
-        return res.status(200).json({
-            success: false,
-            message: req.__("register.already")
-        })
+    try {
+        const { username, email, password } = req.body;
+
+        const user = await UserModel.findOne({ $or: [{ email }, { username }] }).lean();
+        if (user) return res.status(200).json({ success: false, messageKey: "register.already" });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = await new UserModel({ email, username, password: hashedPassword }).save();
+
+        const token = jwt.sign({ id: newUser._id, username: newUser.username }, CONFIG.JWT_SECRET, { expiresIn: "1d" });
+
+        return res.status(201).json({ success: true, messageKey: "register.success", token });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, messageKey: "error.server_error" });
     }
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-    const newUser = new UserModel({ email, username, password: hashedPassword });
-    await newUser.save();
-    if (!newUser._id) {
-        return res.status(200).json({
-            success: false,
-            message: req.__("register.fail")
-        })
-    }
-    const token = jwt.sign(
-        { id: newUser._id, email: newUser.email },
-        CONFIG.JWT_SECRET,
-        { expiresIn: "1d" }
-    );
-    return res.status(201).json({
-        success: true, message: req.__("register.success"),
-        // data: {
-        //     id: user._id,
-        //     username: user.username,
-        //     email: user.email,
-        //     createdAt: user.createdAt
-        // },
-        token
-    });
 };
