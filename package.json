@@ -8,7 +8,7 @@
     "node": ">= 20.9.0"
   },
   "scripts": {
-    "clean": "rm -rf build",
+    "clean": "rimraf build",
     "build": "npm run clean && tsc",
     "start": "node build/index.js",
     "dev": "tsx watch src/index.ts",
