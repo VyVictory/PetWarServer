@@ -7,4 +7,5 @@ const express_1 = require("express");
 const auth_routes_1 = __importDefault(require("../routes/auth/auth.routes"));
 const router = (0, express_1.Router)();
 router.use("/auth", auth_routes_1.default);
+router.use("/health", auth_routes_1.default);
 exports.default = router;

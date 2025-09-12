@@ -6,6 +6,7 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { createServer } from "http";
 import { connectDB } from "./database/database";
+import { listen } from "@colyseus/tools";
 
 const app = express();
 
