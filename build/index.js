@@ -6,7 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const app_config_1 = __importDefault(require("./app.config"));
 const routes_1 = __importDefault(require("./routes"));
-const config_1 = require("./config");
 const colyseus_1 = require("colyseus");
 const ws_transport_1 = require("@colyseus/ws-transport");
 const http_1 = require("http");
@@ -19,7 +18,7 @@ app.use("/", routes_1.default);
 // Connect DB
 (0, database_1.connectDB)();
 // Use PORT from Render
-const PORT = process.env.PORT || config_1.CONFIG.PORT;
+const PORT = 443;
 // HTTP + Colyseus
 const server = (0, http_1.createServer)(app);
 server.timeout = 0;

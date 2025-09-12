@@ -19,7 +19,7 @@ app.use("/", routes);
 connectDB();
 
 // Use PORT from Render
-const PORT = process.env.PORT || CONFIG.PORT;
+const PORT = 443;
 
 // HTTP + Colyseus
 const server = createServer(app);
