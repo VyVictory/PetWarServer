@@ -37,6 +37,9 @@ export class Match3Room extends Room<GameState> {
             }
         }
 
+        console.log("Initial board:");
+        this.printBoard(state.board);
+
         state.currentTurn = 0;
         state.timer = 9;
         this.setState(state);
@@ -51,21 +54,29 @@ export class Match3Room extends Room<GameState> {
 
         // Swap từ client
         this.onMessage("swap", (client, data: { a: Point; b: Point }) => {
-            if (this.getPlayerIndex(client) !== this.state.currentTurn) return;
+            console.log(`Swap request from player ${this.getPlayerIndex(client)}:`, data);
+
+            if (this.getPlayerIndex(client) !== this.state.currentTurn) {
+                console.log("❌ Not this player's turn!");
+                return;
+            }
 
             const result = this.handleSwap(data.a, data.b);
 
             if (!result.valid) {
+                console.log("❌ Invalid swap:", data);
                 client.send("invalid_swap", data);
                 return;
             }
 
+            console.log("✅ Swap result:", result);
             this.broadcast("swap_result", result);
             this.nextTurn();
         });
     }
 
     onJoin(client: Client) {
+        console.log(`Player joined, index = ${this.getPlayerIndex(client)}`);
         client.send("init", JSON.stringify({
             board: this.state.board,
             playerIndex: this.getPlayerIndex(client),
@@ -79,6 +90,7 @@ export class Match3Room extends Room<GameState> {
     nextTurn() {
         this.state.currentTurn = 1 - this.state.currentTurn;
         this.state.timer = 9;
+        console.log(`🔄 Next turn: Player ${this.state.currentTurn}`);
     }
 
     getCell(x: number, y: number) { return this.state.board[y * BOARD_SIZE + x]; }
@@ -120,15 +132,20 @@ export class Match3Room extends Room<GameState> {
             if (streak >= 3) for (let k = 0; k < streak; k++) matches.push({ x, y: BOARD_SIZE - 1 - k });
         }
 
+        if (matches.length > 0) {
+            console.log("✨ Matches found:", matches);
+        }
+
         return matches;
     }
 
     collapseAndSpawn(matchPoints: Point[]): { broken: Point[]; spawned: any[] } {
+        console.log("💥 Collapse triggered with points:", matchPoints);
+
         const spawned: any[] = [];
         const brokenSet = new Set(matchPoints.map(p => `${p.x},${p.y}`));
 
         const remainingCols: Cell[][] = Array.from({ length: BOARD_SIZE }, (): Cell[] => []);
-
 
         for (let x = 0; x < BOARD_SIZE; x++) {
             for (let y = 0; y < BOARD_SIZE; y++) {
@@ -151,15 +168,21 @@ export class Match3Room extends Room<GameState> {
             }
         }
 
+        console.log("📥 Spawned new cells:", spawned);
+
+        this.printBoard(this.state.board);
+
         return { broken: matchPoints, spawned };
     }
 
     handleSwap(a: Point, b: Point) {
+        console.log(`🔄 Swapping (${a.x},${a.y}) <-> (${b.x},${b.y})`);
         this.swapCells(a, b);
 
         let matches = this.findMatches();
         if (matches.length === 0) {
             this.swapCells(a, b); // revert nếu không match
+            console.log("❌ No match found, swap reverted.");
             return { valid: false, broken: [], spawned: [] };
         }
 
@@ -173,6 +196,20 @@ export class Match3Room extends Room<GameState> {
             matches = this.findMatches();
         }
 
+        console.log("✅ Swap success. Broken:", brokenTotal, "Spawned:", spawnedTotal);
+
         return { valid: true, broken: brokenTotal, spawned: spawnedTotal };
+    }
+
+    private printBoard(board: ArraySchema<Cell>) {
+        let str = "";
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            const row = [];
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                row.push(board[y * BOARD_SIZE + x].type);
+            }
+            str += row.join(" ") + "\n";
+        }
+        console.log("\n" + str);
     }
 }
