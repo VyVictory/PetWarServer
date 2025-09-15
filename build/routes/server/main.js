@@ -10,11 +10,11 @@ router.get("/list", (req, res) => {
     const serverInfo = [
         {
             name: "TEST", // đổi theo tên bạn muốn
-            ip: "req.hostname", // hostname từ request
+            ws: "ws://localhost:2567", // hostname từ request
             address: "http://localhost:2567"
         }, {
             name: "TRÁI ĐẤT", // đổi theo tên bạn muốn
-            ip: "req.hostname", // hostname từ request
+            ws: "wss://petwarserver.onrender.com", // hostname từ request
             address: "https://petwarserver.onrender.com"
         }
     ];
