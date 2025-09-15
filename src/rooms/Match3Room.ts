@@ -77,10 +77,10 @@ export class Match3Room extends Room<GameState> {
 
     onJoin(client: Client) {
         console.log(`Player joined, index = ${this.getPlayerIndex(client)}`);
-        client.send("init", JSON.stringify({
+        client.send("init", {
             board: this.state.board,
             playerIndex: this.getPlayerIndex(client),
-        }));
+        });
     }
 
     getPlayerIndex(client: Client) {
