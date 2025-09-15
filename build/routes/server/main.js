@@ -9,11 +9,11 @@ router.get("/ping", (_req, res) => {
 router.get("/list", (req, res) => {
     const serverInfo = [
         {
-            name: "Server Test", // đổi theo tên bạn muốn
+            name: "TEST", // đổi theo tên bạn muốn
             ip: "req.hostname", // hostname từ request
             address: "http://localhost:2567"
         }, {
-            name: "Trái đất", // đổi theo tên bạn muốn
+            name: "TRÁI ĐẤT", // đổi theo tên bạn muốn
             ip: "req.hostname", // hostname từ request
             address: "https://petwarserver.onrender.com"
         }
