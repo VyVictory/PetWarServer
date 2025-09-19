@@ -5,7 +5,7 @@ const colyseus_1 = require("colyseus");
 const GameState_1 = require("./schema/GameState");
 const schema_1 = require("@colyseus/schema");
 const BOARD_SIZE = 8;
-const CELL_TYPES = 6;
+const CELL_TYPES = 5;
 class Match3Room extends colyseus_1.Room {
     constructor() {
         super(...arguments);
@@ -14,7 +14,6 @@ class Match3Room extends colyseus_1.Room {
     onCreate(options) {
         console.log("Room created!");
         const state = new GameState_1.GameState();
-        // Khởi tạo board nhanh + ArraySchema
         state.board = new schema_1.ArraySchema();
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
@@ -33,7 +32,6 @@ class Match3Room extends colyseus_1.Room {
                 state.board[y * BOARD_SIZE + x] = cell;
             }
         }
-        console.log("Initial board:");
         this.printBoard(state.board);
         state.currentTurn = 0;
         state.timer = 9;
@@ -47,34 +45,63 @@ class Match3Room extends colyseus_1.Room {
         }, 1000);
         // Swap từ client
         this.onMessage("swap", (client, data) => {
-            console.log(`Swap request from player ${this.getPlayerIndex(client)}:`, data);
-            if (this.getPlayerIndex(client) !== this.state.currentTurn) {
-                console.log("❌ Not this player's turn!");
+            const playerIndex = this.getPlayerIndex(client);
+            if (playerIndex !== this.state.currentTurn)
+                return;
+            // Swap cells tạm thời
+            this.swapCells(data.a, data.b);
+            let matches = this.findMatches();
+            if (matches.length === 0) {
+                // Không match → revert và gửi thông báo invalid
+                this.swapCells(data.a, data.b);
+                client.send("swap_result", { valid: false, swap: {}, broken: [], spawned: [], batch: 0 });
                 return;
             }
-            const result = this.handleSwap(data.a, data.b);
-            if (!result.valid) {
-                console.log("❌ Invalid swap:", data);
-                client.send("invalid_swap", data);
-                return;
+            // Match hợp lệ → xử lý theo batch
+            let batch = 1;
+            let allBroken = [];
+            let allSpawned = [];
+            while (matches.length > 0) {
+                const { broken, spawned } = this.collapseAndSpawn(matches);
+                allBroken.push(...broken);
+                allSpawned.push(...spawned);
+                // Gửi batch riêng tới client
+                this.broadcast("swap_result", {
+                    valid: true,
+                    broken,
+                    swap: { a: data.a, b: data.b },
+                    spawned,
+                    batch
+                });
+                matches = this.findMatches();
+                batch++;
             }
-            console.log("✅ Swap result:", result);
-            this.broadcast("swap_result", result);
             this.nextTurn();
         });
     }
     onJoin(client) {
-        console.log(`Player joined, index = ${this.getPlayerIndex(client)}`);
-        client.send("init", JSON.stringify({
-            board: this.state.board,
+        // console.log(`Player joined, index = ${this.getPlayerIndex(client)}`);
+        // Gửi trực tiếp object, không cần JSON.stringify
+        client.send("init", {
+            board: this.state.board, // ArraySchema<Cell>
             playerIndex: this.getPlayerIndex(client),
-        }));
+        });
+    }
+    onLeave(client, consented) {
+        console.log(`Player left: index=${this.getPlayerIndex(client)}, consented=${consented}`);
+        // Nếu không còn client nào trong phòng, đóng phòng
+        if (this.clients.length === 0) {
+            console.log("❌ All players left, disposing room...");
+            this.clock.clear(); // Dừng các interval timer nếu có
+            this.disconnect(); // Ngắt kết nối phòng và dọn dẹp
+        }
     }
     getPlayerIndex(client) {
         return this.clients.indexOf(client);
     }
     nextTurn() {
-        this.state.currentTurn = 1 - this.state.currentTurn;
+        this.state.currentTurn = 0;
+        // this.state.currentTurn = 1 - this.state.currentTurn;
         this.state.timer = 9;
         console.log(`🔄 Next turn: Player ${this.state.currentTurn}`);
     }
@@ -123,57 +150,98 @@ class Match3Room extends colyseus_1.Room {
                     matches.push({ x, y: BOARD_SIZE - 1 - k });
         }
         if (matches.length > 0) {
-            console.log("✨ Matches found:", matches);
+            // console.log("✨ Matches found:", matches);
         }
         return matches;
     }
+    // collapseAndSpawn(matchPoints: Point[]): { broken: Point[]; spawned: any[] } {
+    //     // console.log("💥 Collapse triggered with points:", matchPoints);
+    //     const spawned: any[] = [];
+    //     const brokenSet = new Set(matchPoints.map(p => `${p.x},${p.y}`));
+    //     const remainingCols: Cell[][] = Array.from({ length: BOARD_SIZE }, (): Cell[] => []);
+    //     for (let x = 0; x < BOARD_SIZE; x++) {
+    //         for (let y = 0; y < BOARD_SIZE; y++) {
+    //             if (!brokenSet.has(`${x},${y}`)) remainingCols[x].push(this.getCell(x, y));
+    //         }
+    //     }
+    //     for (let x = 0; x < BOARD_SIZE; x++) {
+    //         let pointer = BOARD_SIZE - 1;
+    //         for (let i = remainingCols[x].length - 1; i >= 0; i--) {
+    //             this.setCell(x, pointer--, remainingCols[x][i]);
+    //         }
+    //         for (let y = pointer; y >= 0; y--) {
+    //             const cell = new Cell();
+    //             cell.type = Math.floor(Math.random() * CELL_TYPES);
+    //             cell.value = 10;
+    //             this.setCell(x, y, cell);
+    //             spawned.push({ x, y, type: cell.type, value: cell.value });
+    //         }
+    //     }
+    //     this.printBoard(this.state.board);
+    //     const uniqueBroken = Array.from(new Set(matchPoints.map(p => `${p.x},${p.y}`)))
+    //         .map(str => {
+    //             const [x, y] = str.split(',').map(Number);
+    //             return { x, y };
+    //         });
+    //     return { broken: uniqueBroken, spawned };
+    // }
     collapseAndSpawn(matchPoints) {
-        console.log("💥 Collapse triggered with points:", matchPoints);
-        const spawned = [];
+        // 1️⃣ Loại trừ duplicate broken
         const brokenSet = new Set(matchPoints.map(p => `${p.x},${p.y}`));
+        const uniqueBroken = Array.from(brokenSet).map(str => {
+            const [x, y] = str.split(',').map(Number);
+            return { x, y };
+        });
+        const spawned = [];
+        // 2️⃣ Tạo mảng tạm cho từng cột chứa ô còn lại
+        // const remainingCols: Cell[][] = Array.from({ length: BOARD_SIZE }, () => []);
         const remainingCols = Array.from({ length: BOARD_SIZE }, () => []);
         for (let x = 0; x < BOARD_SIZE; x++) {
             for (let y = 0; y < BOARD_SIZE; y++) {
-                if (!brokenSet.has(`${x},${y}`))
+                if (!brokenSet.has(`${x},${y}`)) {
                     remainingCols[x].push(this.getCell(x, y));
+                }
             }
         }
+        // 3️⃣ Đặt các ô còn lại từ đáy lên
         for (let x = 0; x < BOARD_SIZE; x++) {
             let pointer = BOARD_SIZE - 1;
             for (let i = remainingCols[x].length - 1; i >= 0; i--) {
                 this.setCell(x, pointer--, remainingCols[x][i]);
             }
+            // 4️⃣ Spawn ô mới ở vị trí còn trống từ trên xuống
             for (let y = pointer; y >= 0; y--) {
                 const cell = new GameState_1.Cell();
                 cell.type = Math.floor(Math.random() * CELL_TYPES);
                 cell.value = 10;
                 this.setCell(x, y, cell);
+                // Spawned luôn theo y trên xuống dưới, không trùng
                 spawned.push({ x, y, type: cell.type, value: cell.value });
             }
         }
-        console.log("📥 Spawned new cells:", spawned);
-        this.printBoard(this.state.board);
-        return { broken: matchPoints, spawned };
+        // 5️⃣ Trả về broken & spawned
+        return { broken: uniqueBroken, spawned };
     }
     handleSwap(a, b) {
-        console.log(`🔄 Swapping (${a.x},${a.y}) <-> (${b.x},${b.y})`);
         this.swapCells(a, b);
         let matches = this.findMatches();
         if (matches.length === 0) {
             this.swapCells(a, b); // revert nếu không match
             console.log("❌ No match found, swap reverted.");
-            return { valid: false, broken: [], spawned: [] };
+            return { valid: false, broken: [], spawned: [], batch: 0 };
         }
         const brokenTotal = [];
         const spawnedTotal = [];
+        let batch = 1;
         while (matches.length > 0) {
             const { broken, spawned } = this.collapseAndSpawn(matches);
             brokenTotal.push(...broken);
             spawnedTotal.push(...spawned);
+            // Gửi batch hiện tại (nếu muốn gửi từng đợt riêng) 
             matches = this.findMatches();
+            batch++;
         }
-        console.log("✅ Swap success. Broken:", brokenTotal, "Spawned:", spawnedTotal);
-        return { valid: true, broken: brokenTotal, spawned: spawnedTotal };
+        return { valid: true, broken: brokenTotal, spawned: spawnedTotal, batch: batch - 1 };
     }
     printBoard(board) {
         let str = "";
