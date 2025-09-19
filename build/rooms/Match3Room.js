@@ -76,6 +76,19 @@ class Match3Room extends colyseus_1.Room {
                 matches = this.findMatches();
                 batch++;
             }
+            const totalSummaryObj = {
+                0: { type: 0, count: 3, animation: "attack" }, // 3 ô type 0 → animation attack 
+            };
+            // Gửi batch riêng tới client
+            this.broadcast("swap_result", {
+                valid: true,
+                swap: null, // swap phải luôn có a & b
+                broken: null,
+                spawned: null,
+                batch,
+                player: "left",
+                totalSummary: totalSummaryObj
+            });
             this.nextTurn();
         });
     }
@@ -154,37 +167,6 @@ class Match3Room extends colyseus_1.Room {
         }
         return matches;
     }
-    // collapseAndSpawn(matchPoints: Point[]): { broken: Point[]; spawned: any[] } {
-    //     // console.log("💥 Collapse triggered with points:", matchPoints);
-    //     const spawned: any[] = [];
-    //     const brokenSet = new Set(matchPoints.map(p => `${p.x},${p.y}`));
-    //     const remainingCols: Cell[][] = Array.from({ length: BOARD_SIZE }, (): Cell[] => []);
-    //     for (let x = 0; x < BOARD_SIZE; x++) {
-    //         for (let y = 0; y < BOARD_SIZE; y++) {
-    //             if (!brokenSet.has(`${x},${y}`)) remainingCols[x].push(this.getCell(x, y));
-    //         }
-    //     }
-    //     for (let x = 0; x < BOARD_SIZE; x++) {
-    //         let pointer = BOARD_SIZE - 1;
-    //         for (let i = remainingCols[x].length - 1; i >= 0; i--) {
-    //             this.setCell(x, pointer--, remainingCols[x][i]);
-    //         }
-    //         for (let y = pointer; y >= 0; y--) {
-    //             const cell = new Cell();
-    //             cell.type = Math.floor(Math.random() * CELL_TYPES);
-    //             cell.value = 10;
-    //             this.setCell(x, y, cell);
-    //             spawned.push({ x, y, type: cell.type, value: cell.value });
-    //         }
-    //     }
-    //     this.printBoard(this.state.board);
-    //     const uniqueBroken = Array.from(new Set(matchPoints.map(p => `${p.x},${p.y}`)))
-    //         .map(str => {
-    //             const [x, y] = str.split(',').map(Number);
-    //             return { x, y };
-    //         });
-    //     return { broken: uniqueBroken, spawned };
-    // }
     collapseAndSpawn(matchPoints) {
         // 1️⃣ Loại trừ duplicate broken
         const brokenSet = new Set(matchPoints.map(p => `${p.x},${p.y}`));
@@ -194,8 +176,7 @@ class Match3Room extends colyseus_1.Room {
         });
         const spawned = [];
         // 2️⃣ Tạo mảng tạm cho từng cột chứa ô còn lại
-        // const remainingCols: Cell[][] = Array.from({ length: BOARD_SIZE }, () => []);
-        const remainingCols = Array.from({ length: BOARD_SIZE }, () => []);
+        const remainingCols = Array.from({ length: BOARD_SIZE }, () => new Array());
         for (let x = 0; x < BOARD_SIZE; x++) {
             for (let y = 0; y < BOARD_SIZE; y++) {
                 if (!brokenSet.has(`${x},${y}`)) {
