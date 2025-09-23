@@ -60,15 +60,13 @@ export class Match3Room extends Room<GameState> {
             if (matches.length === 0) {
                 // Không match → revert và gửi thông báo invalid
                 this.swapCells(data.a, data.b);
-                client.send("swap_result", { valid: false, swap: {}, broken: [], spawned: [], batch: 0 });
+                client.send("swap_result", { valid: false, swap: { a: data.a, b: data.b } });
                 return;
             }
-
             // Match hợp lệ → xử lý theo batch
             let batch = 1;
             let allBroken: Point[] = [];
             let allSpawned: any[] = [];
-
             while (matches.length > 0) {
                 const { broken, spawned } = this.collapseAndSpawn(matches);
                 allBroken.push(...broken);
@@ -76,30 +74,32 @@ export class Match3Room extends Room<GameState> {
 
                 // Gửi batch riêng tới client
                 this.broadcast("swap_result", {
-                    valid: true,
                     broken,
-                    swap: { a: data.a, b: data.b },
                     spawned,
                     batch
                 });
                 matches = this.findMatches();
                 batch++;
             }
-            const totalSummaryObj = {
-                0: { type: 0, count: 3, animation: "attack" }, // 3 ô type 0 → animation attack 
-            };
+            const totalSummaryArr = [
+                {
+                    type: 0,
+                    count: 3,
+                    value: 10,
+                    AnimationPetCombo: [{ petId: 0, animationName: "buff" }]
+                },
+                {
+                    type: 0,
+                    count: 3,
+                    value: 10,
+                    AnimationPetCombo: [{ petId: 0, animationName: "attack" }]
+                }
+            ];
 
-            // Gửi batch riêng tới client
-            this.broadcast("swap_result", {
-                valid: true,
-                swap: null, // swap phải luôn có a & b
-                broken: null,
-                spawned: null,
-                batch,
-                player: "left",
-                totalSummary: totalSummaryObj
+            this.broadcast("animation_result", {
+                Player: 0,
+                TotalSummary: totalSummaryArr
             });
-
             this.nextTurn();
         });
     }
